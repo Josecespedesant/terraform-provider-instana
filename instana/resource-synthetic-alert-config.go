@@ -1,12 +1,9 @@
 package instana
 
 import (
-		"context"
-		"github.com/gessnerfl/terraform-provider-instana/instana/restapi"
-		"github.com/gessnerfl/terraform-provider-instana/instana/tagfilter"
-		"github.com/gessnerfl/terraform-provider-instana/tfutils"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/gessnerfl/terraform-provider-instana/instana/restapi"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 // ResourceInstanaSyntheticAlertConfig the name of the terraform-provider-instana resource to manage Synthetic alert configs
@@ -45,10 +42,15 @@ const (
 
 	//SyntheticAlertConfigFieldRuleAggregation constant value for field rule.*.aggregation of resource instana_synthetic_alert_config
 	SyntheticAlertConfigFieldRuleAggregation = "aggregation"
+
+	SyntheticAlertConfigFieldTimeThresholdViolationsInSequence = "violations_in_sequence"
+
+	SyntheticAlertConfigFieldTimeThresholdViolationsInSequenceViolationsCount = "violations_count"
+
+	SyntheticAlertConfigFieldRuleFailure = "failure"
 )
 
 var (
-
 	syntheticAlertRuleTypeKeys = []string{
 		"rule.0.failure",
 	}
@@ -125,7 +127,7 @@ var (
 						},
 					},
 					ExactlyOneOf: syntheticAlertRuleTypeKeys,
-				}
+				},
 			},
 		},
 	}
@@ -138,7 +140,7 @@ var (
 	}
 
 	syntheticAlertConfigSyntheticTestIds = &schema.Schema{
-		Type:     schema.TypeSet,
+		Type: schema.TypeSet,
 		Elem: &schema.Schema{
 			Type: schema.TypeString,
 		},
@@ -161,40 +163,42 @@ var (
 					MinItems:    0,
 					MaxItems:    1,
 					Optional:    true,
-					Description: "Time threshold base on violations in sequence",
+					Description: "Time threshold base on violations in period",
 					Elem: &schema.Resource{
 						Schema: map[string]*schema.Schema{
-							SyntheticAlertConfigFieldTimeThresholdViolationsInSequenceViolations: {
+							SyntheticAlertConfigFieldTimeThresholdViolationsInSequenceViolationsCount: {
 								Type:         schema.TypeInt,
 								Optional:     true,
 								ValidateFunc: validation.IntBetween(1, 12),
-								Description:  "The violations appeared in the sequence",
+								Description:  "The violations appeared in the period",
 							},
 						},
 					},
 					ExactlyOneOf: syntheticAlertTimeThresholdTypeKeys,
-				}
+				},
+			},
 		},
 	}
+)
 
-)var syntheticAlertConfigResourceSchema = map[string]*schema.Schema{
-	SyntheticAlertConfigFieldAlertChannelIds:  syntheticAlertConfigSchemaAlertChannelIDs,
+var syntheticAlertConfigResourceSchema = map[string]*schema.Schema{
+	SyntheticAlertConfigFieldAlertChannelIds:     syntheticAlertConfigSchemaAlertChannelIDs,
 	SyntheticAlertConfigFieldCustomPayloadFields: buildCustomPayloadFields(),
-	SyntheticAlertConfigFieldDescription: syntheticAlertSchemaDescription,
-	SyntheticAlertConfigFieldName: syntheticAlertConfigSchemaName,
-	SyntheticAlertConfigFieldRule: syntheticAlertConfigSchemaRule,
-	SyntheticAlertConfigFieldSeverity: syntheticAlertConfigSchemaSeverity,
-	SyntheticAlertConfigFieldSyntheticTestIds: syntheticAlertConfigSyntheticTestIds,
+	SyntheticAlertConfigFieldDescription:         syntheticAlertSchemaDescription,
+	SyntheticAlertConfigFieldName:                syntheticAlertConfigSchemaName,
+	SyntheticAlertConfigFieldRule:                syntheticAlertConfigSchemaRule,
+	SyntheticAlertConfigFieldSeverity:            syntheticAlertConfigSchemaSeverity,
+	SyntheticAlertConfigFieldSyntheticTestIds:    syntheticAlertConfigSyntheticTestIds,
 	SyntheticAlertConfigFieldTagFilterExpression: syntheticAlertConfigSchemaTagFilterExpression,
-	SyntheticAlertConfigFieldTimeThreshold: syntheticAlertConfigSchemaTimeThreshold,
+	SyntheticAlertConfigFieldTimeThreshold:       syntheticAlertConfigSchemaTimeThreshold,
 }
 
 // NewSyntheticAlertConfigResourceHandle creates a new instance of the ResourceHandle for application alert configs
 func NewSyntheticAlertConfigResourceHandle() ResourceHandle[*restapi.SyntheticAlertConfig] {
 	return &applicationAlertConfigResource{
 		metaData: ResourceMetaData{
-			ResourceName:     ResourceInstanaSyntheticAlertConfig,
-			Schema:           applicationAlertConfigResourceSchema,
+			ResourceName:     ,
+			Schema:           ,
 			SkipIDGeneration: true,
 			SchemaVersion:    1,
 		},

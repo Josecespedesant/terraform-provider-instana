@@ -72,3 +72,8 @@ type TimeThreshold struct {
 	Requests   *int32 `json:"requests"`
 	Violations *int32 `json:"violations"`
 }
+
+type SyntheticTimeThreshold struct {
+	Type            string `json:"type"`
+	ViolationsCount *int32 `json:"violationsCount"`
+}

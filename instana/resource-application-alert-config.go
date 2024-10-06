@@ -2,6 +2,7 @@ package instana
 
 import (
 	"context"
+
 	"github.com/gessnerfl/terraform-provider-instana/instana/restapi"
 	"github.com/gessnerfl/terraform-provider-instana/instana/tagfilter"
 	"github.com/gessnerfl/terraform-provider-instana/tfutils"

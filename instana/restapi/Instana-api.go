@@ -30,6 +30,7 @@ type InstanaAPI interface {
 	APITokens() RestResource[*APIToken]
 	ApplicationConfigs() RestResource[*ApplicationConfig]
 	ApplicationAlertConfigs() RestResource[*ApplicationAlertConfig]
+	SyntheticAlertConfigs() RestResource[*SyntheticAlertConfig]
 	GlobalApplicationAlertConfigs() RestResource[*ApplicationAlertConfig]
 	AlertingChannels() RestResource[*AlertingChannel]
 	AlertingConfigurations() RestResource[*AlertingConfiguration]
@@ -75,6 +76,11 @@ func (api *baseInstanaAPI) ApplicationConfigs() RestResource[*ApplicationConfig]
 // ApplicationAlertConfigs implementation of InstanaAPI interface
 func (api *baseInstanaAPI) ApplicationAlertConfigs() RestResource[*ApplicationAlertConfig] {
 	return NewCreatePOSTUpdatePOSTRestResource(ApplicationAlertConfigsResourcePath, NewCustomPayloadFieldsUnmarshallerAdapter(NewDefaultJSONUnmarshaller(&ApplicationAlertConfig{})), api.client)
+}
+
+// SyntheticAlertConfigs implementation of InstanaAPI interface
+func (api *baseInstanaAPI) SyntheticAlertConfigs() RestResource[**SyntheticAlertConfig] {
+	return NewCreatePOSTUpdatePOSTRestResource(GlobalSyntheticAlertConfigsResourcePath, NewCustomPayloadFieldsUnmarshallerAdapter(NewDefaultJSONUnmarshaller(&SyntheticAlertConfig{})), api.client)
 }
 
 // GlobalApplicationAlertConfigs implementation of InstanaAPI interface
