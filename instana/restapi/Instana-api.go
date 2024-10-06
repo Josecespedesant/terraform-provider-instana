@@ -79,7 +79,7 @@ func (api *baseInstanaAPI) ApplicationAlertConfigs() RestResource[*ApplicationAl
 }
 
 // SyntheticAlertConfigs implementation of InstanaAPI interface
-func (api *baseInstanaAPI) SyntheticAlertConfigs() RestResource[**SyntheticAlertConfig] {
+func (api *baseInstanaAPI) SyntheticAlertConfigs() RestResource[*SyntheticAlertConfig] {
 	return NewCreatePOSTUpdatePOSTRestResource(GlobalSyntheticAlertConfigsResourcePath, NewCustomPayloadFieldsUnmarshallerAdapter(NewDefaultJSONUnmarshaller(&SyntheticAlertConfig{})), api.client)
 }
 

@@ -1,17 +1,21 @@
 package instana
 
 import (
+	"context"
+
 	"github.com/gessnerfl/terraform-provider-instana/instana/restapi"
+	"github.com/gessnerfl/terraform-provider-instana/instana/tagfilter"
+	"github.com/gessnerfl/terraform-provider-instana/tfutils"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 // ResourceInstanaSyntheticAlertConfig the name of the terraform-provider-instana resource to manage Synthetic alert configs
-const ResourceInstanaSyntheticAlertConfig = "instana_Synthetic_alert_config"
+const ResourceInstanaSyntheticAlertConfig = "instana_synthetic_alert_config"
 
 const (
-	//SyntheticAlertConfigFieldAlertChannelIds constant value for the alert channel ids
-	SyntheticAlertConfigFieldAlertChannelIds = "alert_channel_ids"
+	//SyntheticAlertConfigFieldAlertChannelIDs constant value for the alert channel ids
+	SyntheticAlertConfigFieldAlertChannelIDs = "alert_channel_ids"
 
 	//SyntheticAlertConfigFieldCustomPayloadFields
 	SyntheticAlertConfigFieldCustomPayloadFields = "custom_payload_fields"
@@ -32,7 +36,7 @@ const (
 	SyntheticAlertConfigFieldSyntheticTestIds = "synthetic_test_ids"
 
 	//SyntheticAlertConfigFieldTagFilterExpression
-	SyntheticAlertConfigFieldTagFilterExpression = "tag_filter_expression"
+	SyntheticAlertConfigFieldTagFilter = "tag_filter"
 
 	//SyntheticAlertConfigFieldTimeThreshold
 	SyntheticAlertConfigFieldTimeThreshold = "time_threshold"
@@ -92,7 +96,7 @@ var (
 		Description: "List of IDs of alert channels defined in Instana",
 	}
 
-	syntheticAlertSchemaDescription = &schema.Schema{
+	syntheticAlertConfigSchemaDescription = &schema.Schema{
 		Type:         schema.TypeString,
 		Required:     true,
 		Description:  "Description of the synthetic alert configuration",
@@ -148,7 +152,7 @@ var (
 		Description: "IDs of the synthetic tests that this Smart Alert configuration is applied to",
 	}
 
-	syntheticAlertConfigSchemaTagFilterExpression = RequiredTagFilterExpressionSchema
+	syntheticAlertConfigSchemaTagFilter = RequiredTagFilterExpressionSchema
 
 	syntheticAlertConfigSchemaTimeThreshold = &schema.Schema{
 		Type:        schema.TypeList,
@@ -182,28 +186,248 @@ var (
 )
 
 var syntheticAlertConfigResourceSchema = map[string]*schema.Schema{
-	SyntheticAlertConfigFieldAlertChannelIds:     syntheticAlertConfigSchemaAlertChannelIDs,
+	SyntheticAlertConfigFieldAlertChannelIDs:     syntheticAlertConfigSchemaAlertChannelIDs,
 	SyntheticAlertConfigFieldCustomPayloadFields: buildCustomPayloadFields(),
-	SyntheticAlertConfigFieldDescription:         syntheticAlertSchemaDescription,
+	SyntheticAlertConfigFieldDescription:         syntheticAlertConfigSchemaDescription,
 	SyntheticAlertConfigFieldName:                syntheticAlertConfigSchemaName,
 	SyntheticAlertConfigFieldRule:                syntheticAlertConfigSchemaRule,
 	SyntheticAlertConfigFieldSeverity:            syntheticAlertConfigSchemaSeverity,
 	SyntheticAlertConfigFieldSyntheticTestIds:    syntheticAlertConfigSyntheticTestIds,
-	SyntheticAlertConfigFieldTagFilterExpression: syntheticAlertConfigSchemaTagFilterExpression,
+	SyntheticAlertConfigFieldTagFilter:           syntheticAlertConfigSchemaTagFilter,
 	SyntheticAlertConfigFieldTimeThreshold:       syntheticAlertConfigSchemaTimeThreshold,
 }
 
-// NewSyntheticAlertConfigResourceHandle creates a new instance of the ResourceHandle for application alert configs
+// NewSyntheticAlertConfigResourceHandle creates a new instance of the ResourceHandle for synthetic alert configs
 func NewSyntheticAlertConfigResourceHandle() ResourceHandle[*restapi.SyntheticAlertConfig] {
-	return &applicationAlertConfigResource{
+	return &syntheticAlertConfigResource{
 		metaData: ResourceMetaData{
-			ResourceName:     ,
-			Schema:           ,
-			SkipIDGeneration: true,
-			SchemaVersion:    1,
+			ResourceName:  ResourceInstanaSyntheticAlertConfig,
+			Schema:        syntheticAlertConfigResourceSchema,
+			SchemaVersion: 1,
 		},
 		resourceProvider: func(api restapi.InstanaAPI) restapi.RestResource[*restapi.SyntheticAlertConfig] {
 			return api.SyntheticAlertConfigs()
+		},
+	}
+}
+
+type syntheticAlertConfigResource struct {
+	metaData         ResourceMetaData
+	resourceProvider func(api restapi.InstanaAPI) restapi.RestResource[*restapi.SyntheticAlertConfig]
+}
+
+func (r *syntheticAlertConfigResource) MetaData() *ResourceMetaData {
+	return &r.metaData
+}
+
+func (r *syntheticAlertConfigResource) StateUpgraders() []schema.StateUpgrader {
+	return []schema.StateUpgrader{
+		{
+			Type:    r.schemaV0().CoreConfigSchema().ImpliedType(),
+			Upgrade: r.stateUpgradeV0,
+			Version: 0,
+		},
+	}
+}
+
+func (r *syntheticAlertConfigResource) GetRestResource(api restapi.InstanaAPI) restapi.RestResource[*restapi.SyntheticAlertConfig] {
+	return r.resourceProvider(api)
+}
+
+func (r *syntheticAlertConfigResource) SetComputedFields(_ *schema.ResourceData) error {
+	return nil
+}
+
+func (r *syntheticAlertConfigResource) UpdateState(d *schema.ResourceData, config *restapi.SyntheticAlertConfig) error {
+	severity, err := ConvertSeverityFromInstanaAPIToTerraformRepresentation(config.Severity)
+	if err != nil {
+		return err
+	}
+
+	var normalizedTagFilterString *string
+	if config.TagFilterExpression != nil {
+		normalizedTagFilterString, err = tagfilter.MapTagFilterToNormalizedString(config.TagFilterExpression)
+		if err != nil {
+			return err
+		}
+	}
+
+	d.SetId(config.ID)
+	return tfutils.UpdateState(d, map[string]interface{}{
+		SyntheticAlertConfigFieldAlertChannelIDs:  config.AlertChannelIDs,
+		DefaultCustomPayloadFieldsName:            mapCustomPayloadFieldsToSchema(config),
+		SyntheticAlertConfigFieldDescription:      config.Description,
+		SyntheticAlertConfigFieldName:             config.Name,
+		SyntheticAlertConfigFieldRule:             r.mapRuleToSchema(config),
+		SyntheticAlertConfigFieldSeverity:         severity,
+		SyntheticAlertConfigFieldSyntheticTestIds: config.SyntheticTestIds,
+		SyntheticAlertConfigFieldTimeThreshold:    r.mapTimeThresholdToSchema(config),
+		SyntheticAlertConfigFieldTagFilter:        normalizedTagFilterString,
+	})
+}
+
+func (r *syntheticAlertConfigResource) mapRuleToSchema(config *restapi.SyntheticAlertConfig) []map[string]interface{} {
+	ruleAttribute := make(map[string]interface{})
+	ruleAttribute[SyntheticAlertConfigFieldRuleMetricName] = config.Rule.MetricName
+	ruleAttribute[SyntheticAlertConfigFieldRuleAggregation] = config.Rule.Aggregation
+
+	alertType := r.mapAlertTypeToSchema(config.Rule.AlertType)
+	rule := make(map[string]interface{})
+	rule[alertType] = []interface{}{ruleAttribute}
+	result := make([]map[string]interface{}, 1)
+	result[0] = rule
+	return result
+}
+
+func (r *syntheticAlertConfigResource) mapAlertTypeToSchema(alertType string) string {
+	if alertType == "failure" {
+		return SyntheticAlertConfigFieldRuleFailure
+	}
+	return alertType
+}
+
+func (r *syntheticAlertConfigResource) mapTimeThresholdToSchema(config *restapi.SyntheticAlertConfig) []map[string]interface{} {
+	timeThresholdConfig := make(map[string]interface{})
+	if config.TimeThreshold.ViolationsCount != nil {
+		timeThresholdConfig[SyntheticAlertConfigFieldTimeThresholdViolationsInSequenceViolationsCount] = int(*config.TimeThreshold.ViolationsCount)
+	}
+
+	timeThresholdType := r.mapTimeThresholdTypeToSchema(config.TimeThreshold.Type)
+	timeThreshold := make(map[string]interface{})
+	timeThreshold[timeThresholdType] = []interface{}{timeThresholdConfig}
+	result := make([]map[string]interface{}, 1)
+	result[0] = timeThreshold
+	return result
+}
+
+func (r *syntheticAlertConfigResource) mapTimeThresholdTypeToSchema(input string) string {
+	if input == "violationsInSequence" {
+		return SyntheticAlertConfigFieldTimeThresholdViolationsInSequence
+	}
+	return input
+}
+
+func (r *syntheticAlertConfigResource) MapStateToDataObject(d *schema.ResourceData) (*restapi.SyntheticAlertConfig, error) {
+	severity, err := ConvertSeverityFromTerraformToInstanaAPIRepresentation(d.Get(SyntheticAlertConfigFieldSeverity).(string))
+	if err != nil {
+		return nil, err
+	}
+
+	var tagFilter *restapi.TagFilter
+	tagFilterStr, ok := d.GetOk(SyntheticAlertConfigFieldTagFilter)
+	if ok {
+		tagFilter, err = r.mapTagFilterExpressionFromSchema(tagFilterStr.(string))
+		if err != nil {
+			return &restapi.SyntheticAlertConfig{}, err
+		}
+	}
+
+	customPayloadFields, err := mapDefaultCustomPayloadFieldsFromSchema(d)
+	if err != nil {
+		return &restapi.SyntheticAlertConfig{}, err
+	}
+
+	return &restapi.SyntheticAlertConfig{
+		ID:                    d.Id(),
+		AlertChannelIDs:       ReadStringSetParameterFromResource(d, SyntheticAlertConfigFieldAlertChannelIDs),
+		CustomerPayloadFields: customPayloadFields,
+		Description:           d.Get(SyntheticAlertConfigFieldDescription).(string),
+		Name:                  d.Get(SyntheticAlertConfigFieldName).(string),
+		Rule:                  r.mapRuleFromSchema(d),
+		Severity:              severity,
+		SyntheticTestIds:      d.Get(SyntheticAlertConfigFieldSyntheticTestIds).([]string),
+		TagFilterExpression:   tagFilter,
+		TimeThreshold:         r.mapTimeThresholdFromSchema(d),
+	}, nil
+}
+
+func (r *syntheticAlertConfigResource) mapRuleFromSchema(d *schema.ResourceData) restapi.SyntheticAlertRule {
+	ruleSlice := d.Get(SyntheticAlertConfigFieldRule).([]interface{})
+	rule := ruleSlice[0].(map[string]interface{})
+	for alertType, v := range rule {
+		configSlice := v.([]interface{})
+		if len(configSlice) == 1 {
+			config := configSlice[0].(map[string]interface{})
+			return r.mapRuleConfigFromSchema(config, alertType)
+		}
+	}
+	return restapi.SyntheticAlertRule{}
+}
+
+func (r *syntheticAlertConfigResource) mapRuleConfigFromSchema(config map[string]interface{}, alertType string) restapi.SyntheticAlertRule {
+	return restapi.SyntheticAlertRule{
+		AlertType:   r.mapAlertTypeFromSchema(alertType),
+		MetricName:  config[SyntheticAlertConfigFieldRuleMetricName].(string),
+		Aggregation: restapi.Aggregation(config[SyntheticAlertConfigFieldRuleAggregation].(string)),
+	}
+}
+
+func (r *syntheticAlertConfigResource) mapAlertTypeFromSchema(alertType string) string {
+	if alertType == SyntheticAlertConfigFieldRuleFailure {
+		return "failure"
+	}
+	return alertType
+}
+
+func (r *syntheticAlertConfigResource) mapTagFilterExpressionFromSchema(input string) (*restapi.TagFilter, error) {
+	parser := tagfilter.NewParser()
+	expr, err := parser.Parse(input)
+	if err != nil {
+		return nil, err
+	}
+
+	mapper := tagfilter.NewMapper()
+	return mapper.ToAPIModel(expr), nil
+}
+
+func (r *syntheticAlertConfigResource) mapTimeThresholdFromSchema(d *schema.ResourceData) restapi.SyntheticTimeThreshold {
+	timeThresholdSlice := d.Get(SyntheticAlertConfigFieldTimeThreshold).([]interface{})
+	timeThreshold := timeThresholdSlice[0].(map[string]interface{})
+	for timeThresholdType, v := range timeThreshold {
+		configSlice := v.([]interface{})
+		if len(configSlice) == 1 {
+			config := configSlice[0].(map[string]interface{})
+			var violationsPtr *int32
+			if v, ok := config[SyntheticAlertConfigFieldTimeThresholdViolationsInSequence]; ok {
+				violations := int32(v.(int))
+				violationsPtr = &violations
+			}
+			return restapi.SyntheticTimeThreshold{
+				Type:            r.mapTimeThresholdTypeFromSchema(timeThresholdType),
+				ViolationsCount: violationsPtr,
+			}
+		}
+	}
+	return restapi.SyntheticTimeThreshold{}
+}
+
+func (r *syntheticAlertConfigResource) mapTimeThresholdTypeFromSchema(input string) string {
+	if input == SyntheticAlertConfigFieldTimeThresholdViolationsInSequence {
+		return "violationsInSequence"
+	}
+	return input
+}
+
+func (r *syntheticAlertConfigResource) stateUpgradeV0(_ context.Context, state map[string]interface{}, _ interface{}) (map[string]interface{}, error) {
+	if _, ok := state[SyntheticAlertConfigFieldName]; ok {
+		state[SyntheticAlertConfigFieldName] = state[SyntheticAlertConfigFieldName]
+		delete(state, SyntheticAlertConfigFieldName)
+	}
+	return state, nil
+}
+
+func (r *syntheticAlertConfigResource) schemaV0() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			SyntheticAlertConfigFieldAlertChannelIDs:  syntheticAlertConfigSchemaAlertChannelIDs,
+			DefaultCustomPayloadFieldsName:            buildCustomPayloadFields(),
+			SyntheticAlertConfigFieldDescription:      syntheticAlertConfigSchemaDescription,
+			SyntheticAlertConfigFieldName:             syntheticAlertConfigSchemaName,
+			SyntheticAlertConfigFieldRule:             syntheticAlertConfigSchemaRule,
+			SyntheticAlertConfigFieldSeverity:         syntheticAlertConfigSchemaSeverity,
+			SyntheticAlertConfigFieldSyntheticTestIds: syntheticAlertConfigSyntheticTestIds,
+			SyntheticAlertConfigFieldTimeThreshold:    syntheticAlertConfigSchemaTimeThreshold,
+			SyntheticAlertConfigFieldTagFilter:        syntheticAlertConfigSchemaTagFilter,
 		},
 	}
 }
